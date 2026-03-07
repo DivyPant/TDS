@@ -1,10 +1,12 @@
 """
 TDS GA4 Answer Checker — Streamlit deployment.
 Embeds the same client-side checker (HTML + JS) in an iframe so answers match the exam exactly.
+Admin: enter vivek05@tds to see how many people checked in and their email addresses.
 """
 import streamlit as st
 import streamlit.components.v1 as components
 from pathlib import Path
+from datetime import datetime
 
 # Page config (must be first Streamlit command)
 st.set_page_config(
@@ -19,6 +21,32 @@ BASE = Path(__file__).resolve().parent
 INDEX_HTML = BASE / "index.html"
 APP_JS = BASE / "app.js"
 SEEDRANDOM_JS = BASE / "seedrandom.min.js"
+DATA_DIR = BASE / "data"
+CHECKS_FILE = DATA_DIR / "checks.txt"
+
+ADMIN_EMAIL = "vivek05@tds"
+
+
+def ensure_data_dir():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def log_check(email: str):
+    """Append one check (email) to the log file."""
+    if not email or email.strip().lower() == ADMIN_EMAIL.lower():
+        return
+    ensure_data_dir()
+    with open(CHECKS_FILE, "a", encoding="utf-8") as f:
+        f.write(email.strip() + "\n")
+
+
+def read_checks():
+    """Return list of (email, optional_timestamp) for all checks. Timestamp not stored for now."""
+    if not CHECKS_FILE.exists():
+        return []
+    with open(CHECKS_FILE, "r", encoding="utf-8") as f:
+        lines = [ln.strip() for ln in f if ln.strip()]
+    return lines
 
 
 def load_seedrandom():
@@ -31,8 +59,10 @@ def load_seedrandom():
 """
 
 
-def build_embedded_html() -> str:
-    """Build a single HTML string with Bootstrap, seedrandom, and app.js inlined for iframe embedding."""
+def build_embedded_html(prefill_email: str = "") -> str:
+    """Build a single HTML string with Bootstrap, seedrandom, and app.js inlined for iframe embedding.
+    If prefill_email is set, the iframe's email input will be pre-filled (HTML-escaped).
+    """
     html = INDEX_HTML.read_text(encoding="utf-8")
 
     # Remove the two script tags and replace with inline scripts so it works inside Streamlit's iframe
@@ -46,12 +76,67 @@ def build_embedded_html() -> str:
   <script>{app_js_src}</script>"""
     html = html.replace(old_scripts, new_scripts)
 
+    # Optionally pre-fill the email input (escape for JS string)
+    if prefill_email:
+        escaped = prefill_email.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        inject = f"""  <script>document.addEventListener("DOMContentLoaded",function(){{var i=document.getElementById("emailInput");if(i)i.value="{escaped}";}});</script>
+</body>"""
+        html = html.replace("</body>", inject)
+
     return html
 
 
 def main():
     st.title("TDS GA4 Answer Checker")
     st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
+
+    # Admin callout: visible at top so admin can find the option
+    with st.expander("👑 Admin: see who used the checker", expanded=True):
+        st.markdown(
+            f"Enter **`{ADMIN_EMAIL}`** in the **email box below** and click **Go** to see "
+            "how many people have used the checker and their email addresses. "
+            "_(Do not use the email box inside the dark checker area — use the one below.)_"
+        )
+
+    # Email input at top: used for logging and for admin view
+    email = st.text_input("Your registered email", placeholder="you@example.com", key="email_input")
+    go = st.button("Go", type="primary")
+
+    if not go:
+        st.info("Enter your email above and click **Go** to open the answer checker.")
+        return
+
+    if not email or not email.strip():
+        st.warning("Please enter your email.")
+        return
+
+    email_clean = email.strip()
+
+    # Admin view: show count and list of people who checked in
+    if email_clean.lower() == ADMIN_EMAIL.lower():
+        ensure_data_dir()
+        checks = read_checks()
+        count = len(checks)
+        st.success(f"**{count}** people have used the checker so far.")
+        if count > 0:
+            st.subheader("Emails")
+            # Deduplicate but preserve order (first occurrence)
+            seen = set()
+            unique = []
+            for e in checks:
+                if e not in seen:
+                    seen.add(e)
+                    unique.append(e)
+            st.write(f"({len(unique)} unique)")
+            for i, e in enumerate(unique, 1):
+                st.text(f"{i}. {e}")
+            st.download_button("Download list (one email per line)", "\n".join(unique), file_name="checker_emails.txt", mime="text/plain")
+        else:
+            st.caption("No entries yet. When users enter their email and click Go, they are counted here.")
+        return
+
+    # Normal user: log this check and show the answer checker iframe
+    log_check(email_clean)
 
     if not INDEX_HTML.exists():
         st.error(f"Missing {INDEX_HTML}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
@@ -60,7 +145,7 @@ def main():
         st.error(f"Missing {APP_JS}.")
         return
 
-    embedded = build_embedded_html()
+    embedded = build_embedded_html(prefill_email=email_clean)
     components.html(embedded, height=900, scrolling=True)
 
 

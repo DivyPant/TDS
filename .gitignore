@@ -8,6 +8,9 @@ env/
 # Node (if used)
 node_modules/
 
+# App data (visitor log — do not commit)
+data/
+
 # IDE / OS
 .idea/
 .vscode/
