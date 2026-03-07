@@ -2,10 +2,6 @@
 
 Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) questions based on your registered email. All logic runs client-side with the same seeded RNG as the exam.
 
-**Admin (Streamlit only):** To see how many people used the checker and their emails:
-- **Direct link:** open **https://tds-gas.streamlit.app/?view=admin** (bookmark this), or  
-- On the app page, use the **"👑 View visitor stats (admin)"** button or the **"Admin: View visitor stats"** link at the top.
-
 ## Run locally (browser)
 
 Open `index.html` in a browser, or serve the folder:
