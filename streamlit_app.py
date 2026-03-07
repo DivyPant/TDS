@@ -109,22 +109,8 @@ def _render_admin_view():
 
 
 def main():
-    # Admin via URL: https://your-app.streamlit.app/?view=admin
-    if st.query_params.get("view") == "admin":
-        st.title("👑 Visitor stats (admin)")
-        _render_admin_view()
-        st.divider()
-        st.markdown("[← Back to Answer Checker](?)")
-        return
-
     st.title("TDS GA4 Answer Checker")
     st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
-
-    # Admin: direct link so it's visible even if button is below the fold
-    st.markdown(
-        "👑 **Admin:** [View visitor stats (who used the checker)](?view=admin)"
-    )
-    st.divider()
 
     # Admin button: one-click to see visitor stats (no need to type email)
     admin_clicked = st.button("👑 View visitor stats (admin)", type="secondary", use_container_width=True)
@@ -136,10 +122,8 @@ def main():
     email = st.text_input("Your registered email", placeholder="you@example.com", key="email_input")
     go = st.button("Go", type="primary")
 
-    if not go and not admin_clicked:
-        st.info("Enter your email above and click **Go** to open the answer checker.")
-        return
     if not go:
+        st.info("Enter your email above and click **Go** to open the answer checker.")
         return
 
     if not email or not email.strip():
