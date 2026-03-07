@@ -86,31 +86,50 @@ def build_embedded_html(prefill_email: str = "") -> str:
     return html
 
 
+def _render_admin_view():
+    """Show visitor count and email list."""
+    ensure_data_dir()
+    checks = read_checks()
+    count = len(checks)
+    st.success(f"**{count}** people have used the checker so far.")
+    if count > 0:
+        st.subheader("Emails")
+        seen = set()
+        unique = []
+        for e in checks:
+            if e not in seen:
+                seen.add(e)
+                unique.append(e)
+        st.write(f"({len(unique)} unique)")
+        for i, e in enumerate(unique, 1):
+            st.text(f"{i}. {e}")
+        st.download_button("Download list (one email per line)", "\n".join(unique), file_name="checker_emails.txt", mime="text/plain")
+    else:
+        st.caption("No entries yet. When users enter their email and click Go, they are counted here.")
+
+
 def main():
+    # Admin via URL: https://your-app.streamlit.app/?view=admin
+    if st.query_params.get("view") == "admin":
+        st.title("👑 Visitor stats (admin)")
+        _render_admin_view()
+        st.divider()
+        st.markdown("[← Back to Answer Checker](?)")
+        return
+
     st.title("TDS GA4 Answer Checker")
     st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
 
+    # Admin: direct link so it's visible even if button is below the fold
+    st.markdown(
+        "👑 **Admin:** [View visitor stats (who used the checker)](?view=admin)"
+    )
+    st.divider()
+
     # Admin button: one-click to see visitor stats (no need to type email)
-    admin_clicked = st.button("admin)", type="secondary", use_container_width=True)
+    admin_clicked = st.button("👑 View visitor stats (admin)", type="secondary", use_container_width=True)
     if admin_clicked:
-        ensure_data_dir()
-        checks = read_checks()
-        count = len(checks)
-        st.success(f"**{count}** people have used the checker so far.")
-        if count > 0:
-            st.subheader("Emails")
-            seen = set()
-            unique = []
-            for e in checks:
-                if e not in seen:
-                    seen.add(e)
-                    unique.append(e)
-            st.write(f"({len(unique)} unique)")
-            for i, e in enumerate(unique, 1):
-                st.text(f"{i}. {e}")
-            st.download_button("Download list (one email per line)", "\n".join(unique), file_name="checker_emails.txt", mime="text/plain")
-        else:
-            st.caption("No entries yet. When users enter their email and click Go, they are counted here.")
+        _render_admin_view()
         return
 
     # Email input: for answer checker (and optional admin via email)
