@@ -1,0 +1,24 @@
+{
+  "name": "tds",
+  "version": "1.0.0",
+  "description": "Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) questions based on your registered email. All logic runs client-side with the same seeded RNG as the exam.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vivek-k1/TDS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vivek-k1/TDS/issues"
+  },
+  "homepage": "https://github.com/vivek-k1/TDS#readme",
+  "dependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "seedrandom": "^3.0.5"
+  }
+}
