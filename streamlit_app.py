@@ -19,6 +19,9 @@ BASE = Path(__file__).resolve().parent
 INDEX_HTML = BASE / "index.html"
 APP_JS = BASE / "app.js"
 SEEDRANDOM_JS = BASE / "seedrandom.min.js"
+DATA_DIR = BASE / "data"
+CHECKS_FILE = DATA_DIR / "checks.txt"
+ADMIN_EMAIL = "vivek@tds"
 
 
 def load_seedrandom():
@@ -31,7 +34,7 @@ def load_seedrandom():
 """
 
 
-def build_embedded_html() -> str:
+def build_embedded_html(prefill_email: str | None = None) -> str:
     """Build a single HTML string with Bootstrap, seedrandom, and app.js inlined for iframe embedding."""
     html = INDEX_HTML.read_text(encoding="utf-8")
 
@@ -46,7 +49,33 @@ def build_embedded_html() -> str:
   <script>{app_js_src}</script>"""
     html = html.replace(old_scripts, new_scripts)
 
+    if prefill_email:
+        esc = prefill_email.replace("\\", "\\\\").replace('"', '\\"').replace("<", "\\u003c")
+        inject = f'<script>document.addEventListener("DOMContentLoaded",function(){{var e=document.getElementById("emailInput");if(e)e.value="{esc}";}});</script>'
+        html = html.replace("</body>", inject + "\n</body>")
+
     return html
+
+
+def log_visitor(email: str) -> None:
+    """Append visitor email to data/checks.txt (one per line)."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CHECKS_FILE, "a", encoding="utf-8") as f:
+        f.write(email.strip() + "\n")
+
+
+def render_admin_view() -> None:
+    """Show how many people checked in and list their emails."""
+    st.subheader("Visitor stats")
+    if not CHECKS_FILE.exists():
+        st.info("No check-ins yet.")
+        return
+    lines = CHECKS_FILE.read_text(encoding="utf-8").strip().splitlines()
+    emails = [ln.strip() for ln in lines if ln.strip()]
+    st.metric("Total check-ins", len(emails))
+    st.write("**Emails:**")
+    for i, e in enumerate(emails, 1):
+        st.text(f"{i}. {e}")
 
 
 def main():
@@ -60,7 +89,21 @@ def main():
         st.error(f"Missing {APP_JS}.")
         return
 
-    embedded = build_embedded_html()
+    with st.form("email_form"):
+        email = st.text_input("Email address", placeholder="you@example.com", key="visitor_email")
+        submitted = st.form_submit_button("Go")
+
+    if submitted and email and email.strip().lower() == ADMIN_EMAIL.lower():
+        render_admin_view()
+        return
+
+    if submitted and email and email.strip():
+        log_visitor(email.strip())
+        prefill = email.strip()
+    else:
+        prefill = None
+
+    embedded = build_embedded_html(prefill_email=prefill)
     components.html(embedded, height=900, scrolling=True)
 
 

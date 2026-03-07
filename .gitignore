@@ -8,6 +8,9 @@ env/
 # Node (if used)
 node_modules/
 
+# Visitor log (admin only)
+data/
+
 # IDE / OS
 .idea/
 .vscode/
