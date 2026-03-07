@@ -90,20 +90,37 @@ def main():
     st.title("TDS GA4 Answer Checker")
     st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
 
-    # Admin callout: visible at top so admin can find the option
-    with st.expander("👑 Admin: see who used the checker", expanded=True):
-        st.markdown(
-            f"Enter **`{ADMIN_EMAIL}`** in the **email box below** and click **Go** to see "
-            "how many people have used the checker and their email addresses. "
-            "_(Do not use the email box inside the dark checker area — use the one below.)_"
-        )
+    # Admin button: one-click to see visitor stats (no need to type email)
+    admin_clicked = st.button("admin)", type="secondary", use_container_width=True)
+    if admin_clicked:
+        ensure_data_dir()
+        checks = read_checks()
+        count = len(checks)
+        st.success(f"**{count}** people have used the checker so far.")
+        if count > 0:
+            st.subheader("Emails")
+            seen = set()
+            unique = []
+            for e in checks:
+                if e not in seen:
+                    seen.add(e)
+                    unique.append(e)
+            st.write(f"({len(unique)} unique)")
+            for i, e in enumerate(unique, 1):
+                st.text(f"{i}. {e}")
+            st.download_button("Download list (one email per line)", "\n".join(unique), file_name="checker_emails.txt", mime="text/plain")
+        else:
+            st.caption("No entries yet. When users enter their email and click Go, they are counted here.")
+        return
 
-    # Email input at top: used for logging and for admin view
+    # Email input: for answer checker (and optional admin via email)
     email = st.text_input("Your registered email", placeholder="you@example.com", key="email_input")
     go = st.button("Go", type="primary")
 
-    if not go:
+    if not go and not admin_clicked:
         st.info("Enter your email above and click **Go** to open the answer checker.")
+        return
+    if not go:
         return
 
     if not email or not email.strip():
