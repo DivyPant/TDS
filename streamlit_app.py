@@ -78,9 +78,31 @@ def render_admin_view() -> None:
         st.text(f"{i}. {e}")
 
 
+# Google AdSense client ID
+ADSENSE_CLIENT = "ca-pub-9674118663923293"
+
+
+def render_adsense():
+    """Inject Google AdSense script and a responsive ad unit."""
+    html = f"""
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={ADSENSE_CLIENT}"
+     crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="{ADSENSE_CLIENT}"
+     data-ad-slot="YOUR_AD_SLOT_ID"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>(adsbygoogle = window.adsbygoogle || []).push({{}});</script>
+"""
+    components.html(html, height=100)
+
+
 def main():
     st.title("TDS GA4 Answer Checker")
     st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
+
+    render_adsense()
 
     if not INDEX_HTML.exists():
         st.error(f"Missing {INDEX_HTML}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
