@@ -2,9 +2,19 @@
 TDS GA4 Answer Checker — Streamlit deployment.
 Embeds the same client-side checker (HTML + JS) in an iframe so answers match the exam exactly.
 """
+import datetime as dt
+from functools import lru_cache
+
 import streamlit as st
 import streamlit.components.v1 as components
 from pathlib import Path
+
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+except Exception:
+    gspread = None
+    Credentials = None
 
 # Page config (must be first Streamlit command)
 st.set_page_config(
@@ -57,21 +67,87 @@ def build_embedded_html(prefill_email: str | None = None) -> str:
     return html
 
 
+@lru_cache(maxsize=1)
+def _get_google_sheet():
+    """Return a Google Sheet instance if configured, else None."""
+    if gspread is None or Credentials is None:
+        return None
+    try:
+        service_info = st.secrets["gcp_service_account"]
+        sheet_id = st.secrets.get("VISITOR_SHEET_ID")
+    except Exception:
+        return None
+    if not sheet_id:
+        return None
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    try:
+        creds = Credentials.from_service_account_info(service_info, scopes=scopes)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(sheet_id).sheet1
+        # Ensure headers exist on a brand new sheet
+        if not sheet.get_all_values():
+            sheet.append_row(["timestamp_utc", "email"])
+        return sheet
+    except Exception:
+        return None
+
+
+def _load_emails_from_sheet() -> list[str] | None:
+    """Load emails from Google Sheet if configured. Returns None on any failure."""
+    sheet = _get_google_sheet()
+    if sheet is None:
+        return None
+    try:
+        values = sheet.col_values(2)
+        # Skip header row, keep non-empty entries
+        return [v.strip() for v in values[1:] if v.strip()]
+    except Exception:
+        return None
+
+
 def log_visitor(email: str) -> None:
-    """Append visitor email to data/checks.txt (one per line)."""
+    """Append visitor email to a persistent store (Google Sheet if available, else local file)."""
+    email_clean = email.strip()
+
+    # Primary: Google Sheet (persists across Streamlit restarts)
+    sheet = _get_google_sheet()
+    if sheet is not None:
+        try:
+            ts = dt.datetime.utcnow().isoformat(timespec="seconds")
+            sheet.append_row([ts, email_clean])
+            return
+        except Exception:
+            # If something goes wrong, fall back to local file
+            pass
+
+    # Fallback: local text file (works locally, but ephemeral on Streamlit Cloud)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(CHECKS_FILE, "a", encoding="utf-8") as f:
-        f.write(email.strip() + "\n")
+        f.write(email_clean + "\n")
 
 
 def render_admin_view() -> None:
     """Show how many people checked in and list their emails."""
     st.subheader("Visitor stats")
-    if not CHECKS_FILE.exists():
+
+    # Try Google Sheet first
+    emails = _load_emails_from_sheet()
+
+    # If sheet not configured or errored, fall back to local file
+    if emails is None:
+        if not CHECKS_FILE.exists():
+            st.info("No check-ins yet.")
+            return
+        lines = CHECKS_FILE.read_text(encoding="utf-8").strip().splitlines()
+        emails = [ln.strip() for ln in lines if ln.strip()]
+
+    if not emails:
         st.info("No check-ins yet.")
         return
-    lines = CHECKS_FILE.read_text(encoding="utf-8").strip().splitlines()
-    emails = [ln.strip() for ln in lines if ln.strip()]
+
     st.metric("Total check-ins", len(emails))
     st.write("**Emails:**")
     for i, e in enumerate(emails, 1):
@@ -99,10 +175,35 @@ def render_adsense():
 
 
 def main():
-    st.title("TDS GA4 Answer Checker")
-    st.caption("Compute answers for [TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) using your registered email.")
+    st.title("TDS Answer Checker")
+
+    exam_choice = st.selectbox(
+        "Exam / Project",
+        ("GA4", "GA5", "Project 1"),
+        index=0,
+    )
+
+    if exam_choice == "GA4":
+        st.caption(
+            "Compute answers for "
+            "[TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) "
+            "using your registered email."
+        )
+    elif exam_choice == "GA5":
+        st.caption(
+            "GA5 checker (not yet wired up in this app — only GA4 is currently available)."
+        )
+    else:
+        st.caption(
+            "Project 1 checker (not yet wired up in this app — only GA4 is currently available)."
+        )
 
     render_adsense()
+
+    # For now, only GA4 is implemented in this Streamlit app.
+    if exam_choice != "GA4":
+        st.info(f"{exam_choice} answer checker is not yet configured here. Please select GA4.")
+        return
 
     if not INDEX_HTML.exists():
         st.error(f"Missing {INDEX_HTML}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
