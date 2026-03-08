@@ -32,6 +32,10 @@ SEEDRANDOM_JS = BASE / "seedrandom.min.js"
 DATA_DIR = BASE / "data"
 CHECKS_FILE = DATA_DIR / "checks.txt"
 ADMIN_EMAIL = "vivek@tds"
+GA4_URL = "https://exam.sanand.workers.dev/tds-2026-01-ga4"
+# Assumed patterns for GA5 and Project 1 exam pages; update if your URLs differ.
+GA5_URL = "https://exam.sanand.workers.dev/tds-2026-01-ga5"
+PROJECT1_URL = "https://exam.sanand.workers.dev/tds-2026-01-project1"
 
 
 def load_seedrandom():
@@ -186,25 +190,29 @@ def main():
     if exam_choice == "GA4":
         st.caption(
             "Compute answers for "
-            "[TDS 2026-01 GA4](https://exam.sanand.workers.dev/tds-2026-01-ga4) "
+            f"[TDS 2026-01 GA4]({GA4_URL}) "
             "using your registered email."
         )
     elif exam_choice == "GA5":
         st.caption(
-            "GA5 checker (not yet wired up in this app — only GA4 is currently available)."
+            f"Embedded GA5 exam page from [{GA5_URL}]({GA5_URL})."
         )
     else:
         st.caption(
-            "Project 1 checker (not yet wired up in this app — only GA4 is currently available)."
+            f"Embedded Project 1 exam page from [{PROJECT1_URL}]({PROJECT1_URL})."
         )
 
     render_adsense()
 
-    # For now, only GA4 is implemented in this Streamlit app.
-    if exam_choice != "GA4":
-        st.info(f"{exam_choice} answer checker is not yet configured here. Please select GA4.")
+    # GA5 / Project 1: embed the official exam sites directly in iframes.
+    if exam_choice == "GA5":
+        components.iframe(GA5_URL, height=900, scrolling=True)
+        return
+    if exam_choice == "Project 1":
+        components.iframe(PROJECT1_URL, height=900, scrolling=True)
         return
 
+    # GA4: local answer checker using embedded HTML + app.js
     if not INDEX_HTML.exists():
         st.error(f"Missing {INDEX_HTML}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
         return
