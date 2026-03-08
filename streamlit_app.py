@@ -28,6 +28,8 @@ st.set_page_config(
 BASE = Path(__file__).resolve().parent
 INDEX_HTML = BASE / "index.html"
 APP_JS = BASE / "app.js"
+INDEX_GA5_HTML = BASE / "index_ga5.html"
+APP_GA5_JS = BASE / "app_ga5.js"
 SEEDRANDOM_JS = BASE / "seedrandom.min.js"
 DATA_DIR = BASE / "data"
 CHECKS_FILE = DATA_DIR / "checks.txt"
@@ -48,20 +50,24 @@ def load_seedrandom():
 """
 
 
-def build_embedded_html(prefill_email: str | None = None) -> str:
+def build_embedded_html(prefill_email: str | None = None, ga5: bool = False) -> str:
     """Build a single HTML string with Bootstrap, seedrandom, and app.js inlined for iframe embedding."""
-    html = INDEX_HTML.read_text(encoding="utf-8")
+    index_file = INDEX_GA5_HTML if ga5 else INDEX_HTML
+    app_file = APP_GA5_JS if ga5 else APP_JS
+    html = index_file.read_text(encoding="utf-8")
 
     # Remove the two script tags and replace with inline scripts so it works inside Streamlit's iframe
     seedrandom_src = load_seedrandom()
-    app_js_src = APP_JS.read_text(encoding="utf-8")
+    app_js_src = app_file.read_text(encoding="utf-8")
 
-    # Replace script tags with inline versions
-    old_scripts = """  <script src="https://cdn.jsdelivr.net/npm/seedrandom@3.0.5/seedrandom.min.js"></script>
+    # Replace script tags with inline versions (GA4 vs GA5 have different script src)
+    old_ga4 = """  <script src="https://cdn.jsdelivr.net/npm/seedrandom@3.0.5/seedrandom.min.js"></script>
   <script src="app.js?v=3"></script>"""
+    old_ga5 = """  <script src="https://cdn.jsdelivr.net/npm/seedrandom@3.0.5/seedrandom.min.js"></script>
+  <script src="app_ga5.js?v=1"></script>"""
     new_scripts = f"""  <script>{seedrandom_src}</script>
   <script>{app_js_src}</script>"""
-    html = html.replace(old_scripts, new_scripts)
+    html = html.replace(old_ga4, new_scripts).replace(old_ga5, new_scripts)
 
     if prefill_email:
         esc = prefill_email.replace("\\", "\\\\").replace('"', '\\"').replace("<", "\\u003c")
@@ -195,7 +201,9 @@ def main():
         )
     elif exam_choice == "GA5":
         st.caption(
-            f"Embedded GA5 exam page from [{GA5_URL}]({GA5_URL})."
+            "Compute answers for "
+            f"[TDS 2026-01 GA5]({GA5_URL}) "
+            "using your registered email."
         )
     else:
         st.caption(
@@ -204,20 +212,20 @@ def main():
 
     render_adsense()
 
-    # GA5 / Project 1: embed the official exam sites directly in iframes.
-    if exam_choice == "GA5":
-        components.iframe(GA5_URL, height=900, scrolling=True)
-        return
+    # Project 1: embed the official exam site directly in iframe.
     if exam_choice == "Project 1":
         components.iframe(PROJECT1_URL, height=900, scrolling=True)
         return
 
-    # GA4: local answer checker using embedded HTML + app.js
-    if not INDEX_HTML.exists():
-        st.error(f"Missing {INDEX_HTML}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
+    # GA4 / GA5: local answer checker using embedded HTML + app.js
+    is_ga5 = exam_choice == "GA5"
+    index_file = INDEX_GA5_HTML if is_ga5 else INDEX_HTML
+    app_file = APP_GA5_JS if is_ga5 else APP_JS
+    if not index_file.exists():
+        st.error(f"Missing {index_file}. Run this app from the project root (e.g. `streamlit run streamlit_app.py`).")
         return
-    if not APP_JS.exists():
-        st.error(f"Missing {APP_JS}.")
+    if not app_file.exists():
+        st.error(f"Missing {app_file}.")
         return
 
     with st.form("email_form"):
@@ -234,7 +242,7 @@ def main():
     else:
         prefill = None
 
-    embedded = build_embedded_html(prefill_email=prefill)
+    embedded = build_embedded_html(prefill_email=prefill, ga5=is_ga5)
     components.html(embedded, height=900, scrolling=True)
 
 
